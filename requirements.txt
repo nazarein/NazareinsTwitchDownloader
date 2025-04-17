@@ -1,0 +1,7 @@
+aiohttp
+websockets
+certifi
+streamlink
+pystray; platform_system == "Windows"
+pywin32; platform_system == "Windows" 
+pillow; platform_system == "Windows"
