@@ -1,0 +1,11 @@
+services:
+  twitch-downloader:
+    build: .
+    container_name: nazareins-twitch-downloader
+    ports:
+      - "8420:8420"
+    volumes:
+      - /mnt:/mnt
+    security_opt:
+      - apparmor=unconfined
+    restart: unless-stopped
