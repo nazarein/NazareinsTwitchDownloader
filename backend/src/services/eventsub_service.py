@@ -10,6 +10,8 @@ import logging
 from typing import Dict, Set, List, Any, Optional
 import websockets
 import aiohttp
+import ssl
+import certifi
 
 from backend.src.config.constants import EVENTSUB_CLIENT_ID
 from backend.src.config.settings import get_monitored_streamers, update_monitored_streamers
@@ -295,6 +297,8 @@ class EventSubService:
                     # Clear the reconnect URL after using it - they're typically one-time use
                     del self.reconnect_urls[connection_id]
                 
+                ssl_context = ssl.create_default_context(cafile=certifi.where())
+
                 # Connect to EventSub WebSocket
                 async with websockets.connect(
                     ws_url, 
@@ -304,7 +308,8 @@ class EventSubService:
                     additional_headers={    # Add proper headers
                         'User-Agent': 'NazareinsTwitchDownloader/1.0',
                         'Origin': 'https://twitch.tv'
-                    }
+                    },
+                    ssl=ssl_context  # Add this parameter
                 ) as websocket:
                     print(f"[EventSub] Connection {connection_id}: Connected successfully")
                     
