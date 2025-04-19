@@ -501,7 +501,10 @@ class EventSubService:
                 
                     # Check if network is back by making a simple request
                     try:
-                        async with aiohttp.ClientSession() as session:
+                        # Create SSL context
+                        ssl_context = ssl.create_default_context(cafile=certifi.where())
+                        
+                        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
                             async with session.get("https://api.twitch.tv/helix", timeout=5) as response:
                                 pass  # We just need to check if the request succeeds
                     except Exception:
@@ -616,7 +619,10 @@ class EventSubService:
                 "Authorization": f"Bearer {token_to_use}",  # Use the fresh token
             }
                 
-            async with aiohttp.ClientSession() as session:
+            # Create SSL context
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+            
+            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
                 async with session.get(url, headers=headers) as response:
                     if response.status == 200:
                         data = await response.json()
@@ -714,7 +720,10 @@ class EventSubService:
         
         while current_attempt < max_attempts:
             try:
-                async with aiohttp.ClientSession() as session:
+                # Create SSL context
+                ssl_context = ssl.create_default_context(cafile=certifi.where())
+                
+                async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
                     # Add a timeout to the request to avoid hanging
                     async with session.post(url, headers=headers, json=payload, timeout=30) as response:
                         if response.status == 202:
@@ -802,7 +811,9 @@ class EventSubService:
                 "Authorization": f"Bearer {self.token}",
             }
             
-            async with aiohttp.ClientSession() as session:
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+            
+            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
                 async with session.get(url, headers=headers) as response:
                     if response.status == 200:
                         data = await response.json()
@@ -926,7 +937,9 @@ class EventSubService:
                 "Authorization": f"Bearer {self.token}",
             }
             
-            async with aiohttp.ClientSession() as session:
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+            
+            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
                 async with session.get(url, headers=headers) as response:
                     if response.status == 200:
                         data = await response.json()
@@ -1218,7 +1231,9 @@ class EventSubService:
                 "Authorization": f"Bearer {self.token}",
             }
             
-            async with aiohttp.ClientSession() as session:
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+            
+            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
                 async with session.get(url, headers=headers) as response:
                     if response.status == 200:
                         data = await response.json()
@@ -1439,7 +1454,9 @@ class EventSubService:
                 }
                 
                 # First, get all active subscriptions to find the one(s) for this user_id
-                async with aiohttp.ClientSession() as session:
+                ssl_context = ssl.create_default_context(cafile=certifi.where())
+                
+                async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
                     async with session.get(url, headers=headers, timeout=30) as response:
                         if response.status == 200:
                             data = await response.json()
