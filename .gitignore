@@ -10,6 +10,7 @@ ENV/
 /build/
 develop-eggs/
 dist/
+installer/
 downloads/
 eggs/
 .eggs/
@@ -36,6 +37,7 @@ yarn-error.log*
 # Auth/Tokens - Application-specific
 **/token.json
 **/twitch_auth_cookie.txt
+auth_server.py
 
 # IDEs
 .idea/
