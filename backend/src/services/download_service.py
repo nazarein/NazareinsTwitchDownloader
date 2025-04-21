@@ -135,6 +135,33 @@ class DownloadService:
                 print(f"[DownloadService] Download already in progress for {streamer}, skipping")
                 return
 
+            # ADD THIS NEW CODE BLOCK HERE - Verify stream is still live
+            try:
+                from backend.src.services.gql_client import GQLClient
+                gql_client = GQLClient()
+                
+                # Get the streamer's Twitch ID
+                twitch_id = settings.get("twitch_id", "")
+                if not twitch_id:
+                    # If no Twitch ID, look it up (you already have this logic below)
+                    from backend.src.config.settings import get_monitored_streamers
+                    streamers = get_monitored_streamers()
+                    if streamer in streamers:
+                        twitch_id = streamers[streamer].get("twitch_id", "")
+                
+                if twitch_id:
+                    # Fetch current channel info directly to verify it's still live
+                    channel_info = await gql_client.get_channel_info(twitch_id)
+                    if not channel_info or not channel_info.get("stream"):
+                        print(f"[DownloadService] Stream is no longer live for {streamer}, aborting download")
+                        # Notify WebSocket clients
+                        await self.websocket_manager.broadcast_download_status(
+                            streamer, "stopped"
+                        )
+                        return
+            except Exception as e:
+                print(f"[DownloadService] Error checking live status for {streamer}: {e}")
+
             # Get the selected resolution (defaulting to "best" if not set)
             selected_resolution = settings.get("stream_resolution", "best")
 
