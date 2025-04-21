@@ -74,7 +74,7 @@ const Console = ({ initiallyExpanded = false }) => {
           const data = JSON.parse(event.data);
           if (data.type === 'log') {
             setLogMessages(prev => [...prev, {
-              timestamp: new Date().toISOString(),
+              timestamp: data.timestamp * 1000,  // Convert server timestamp (seconds) to JS milliseconds
               message: data.message,
               level: data.level || 'info',
               id: Date.now() + Math.random() // Unique ID for React keys
@@ -83,7 +83,7 @@ const Console = ({ initiallyExpanded = false }) => {
         } catch (error) {
           // Fall back to treating as plain text message
           setLogMessages(prev => [...prev, {
-            timestamp: new Date().toISOString(),
+            timestamp: Date.now(),  // Use current time for non-JSON messages
             message: event.data,
             level: 'info',
             id: Date.now() + Math.random()
