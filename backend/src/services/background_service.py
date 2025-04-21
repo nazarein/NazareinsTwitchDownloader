@@ -29,6 +29,14 @@ class StreamMonitorService:
         self.update_interval = 300  # Poll interval in seconds (5 minutes)
         self.running = False
         self.last_update_time = {}  # Tracks when each streamer was last updated
+        self.recovery_lock = asyncio.Lock()
+        self.recent_recoveries = {}
+        self.health_metrics = {
+            "eventsub_reconnects": 0,
+            "token_refreshes": 0,
+            "zombie_terminations": 0,
+            "missing_downloads": 0
+        }
         
         # Initialize token manager for OAuth authentication
         from backend.src.config.settings import CONFIG_DIR
@@ -82,6 +90,10 @@ class StreamMonitorService:
         
         # Start scheduled backup of configuration
         asyncio.create_task(self._backup_scheduler())
+        
+        # Add this new task for supervision
+        asyncio.create_task(self._supervision_loop())
+
         
     async def _backup_scheduler(self):
         """
@@ -333,3 +345,115 @@ class StreamMonitorService:
             "last_update": self.last_update_time,
             "eventsub": eventsub_status
         }
+    
+    async def _supervision_loop(self):
+        """
+        Periodically check system health and perform recovery actions.
+        Acts as a supervisor to ensure all services are functioning properly.
+        """
+        # Wait a bit after startup before beginning supervision
+        await asyncio.sleep(300)  # 5 minutes
+        
+        supervision_interval = 600  # 10 minutes between checks
+        
+        while self.running:
+            try:
+                
+                # Check 1: EventSub connection health
+                await self._check_eventsub_health()
+                
+                # Check 2: Token validity
+                await self._check_token_health()
+                
+                # Check 3: Streamer status consistency
+                await self._check_streamer_consistency()
+                
+                # Check 4: Download service state
+                await self._check_download_service()
+            except Exception as e:
+                print(f"[Monitor] Error during supervision: {e}")
+                
+            # Wait until next supervision cycle
+            await asyncio.sleep(supervision_interval)
+        
+    async def _check_eventsub_health(self):
+        """Verify EventSub connections are working properly."""
+        # Get EventSub status
+        status = self.eventsub_service.get_status()
+        
+        # Check active connections
+        active_connections = status.get("active_connections", 0)
+        streamers = get_monitored_streamers()
+        expected_connections = min(3, (len(streamers) + 4) // 5)  # Each connection handles ~5 streamers
+        
+        # If we have streamers but no active connections, restart EventSub
+        if len(streamers) > 0 and active_connections == 0:
+            # Add this recovery tracking
+            current_time = time.time()
+            if "eventsub" in self.recent_recoveries:
+                last_recovery = self.recent_recoveries["eventsub"]
+                if current_time - last_recovery < 3600:  # Once per hour max
+                    print(f"[Monitor] Skipping EventSub recovery, last attempt at {time.ctime(last_recovery)}")
+                    return
+                    
+            print("[Monitor] ⚠️ EventSub connections not active, attempting reconnection")
+            async with self.recovery_lock:
+                await self.restart_eventsub()
+                self.recent_recoveries["eventsub"] = current_time
+                self.health_metrics["eventsub_reconnects"] += 1
+            
+    async def _check_token_health(self):
+        """Verify OAuth tokens are valid and not near expiration."""
+        if not hasattr(self, 'token_manager') or not self.token_manager:
+            return
+            
+        # Get token status but don't force refresh
+        token, refreshed = await self.token_manager.get_access_token()
+        
+        if not token:
+            print("[Monitor] ⚠️ No valid authentication token available")
+            return
+            
+        # Optionally test the token validity
+        token_valid = await self.token_manager.validate_token(token)
+        if not token_valid:
+            print("[Monitor] ⚠️ Token validation failed, forcing refresh")
+            await self.token_manager.get_access_token(force_refresh=True)
+            
+    async def _check_streamer_consistency(self):
+        """Check for inconsistencies in streamer status and subscriptions."""
+        streamers = get_monitored_streamers()
+        
+        # Get status of EventSub subscriptions
+        eventsub_status = self.eventsub_service.get_status()
+        subscriptions_count = len(self.eventsub_service.active_subscriptions)
+        
+        # Find streamers with IDs that should have subscriptions
+        streamers_with_ids = [s for s, settings in streamers.items() 
+                            if settings.get("twitch_id")]
+        
+        # Check for significant subscription mismatch
+        if len(streamers_with_ids) > subscriptions_count + 3:
+            print(f"[Monitor] ⚠️ Subscription mismatch: {len(streamers_with_ids)} streamers with IDs, but only {subscriptions_count} subscriptions")
+            # Refresh EventSub connections
+            await self.restart_eventsub()
+            
+        # Check for zombies - downloads running for offline streamers
+        for streamer, settings in streamers.items():
+            # If not live but download is active
+            if not settings.get("isLive", False) and streamer in self.download_service.active_downloads:
+                print(f"[Monitor] ⚠️ Zombie download detected for {streamer}")
+                await self.download_service.stop_download(streamer)
+
+    async def _check_download_service(self):
+        """Verify download service is functioning as expected."""
+        streamers = get_monitored_streamers()
+        
+        # Check for enabled+live streamers without active downloads
+        for streamer, settings in streamers.items():
+            if (settings.get("downloads_enabled", False) and 
+                settings.get("isLive", False) and 
+                streamer not in self.download_service.active_downloads):
+                
+                print(f"[Monitor] 🔄 Restarting missing download for {streamer}")
+                await self.download_service.start_download(streamer, settings)
