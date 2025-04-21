@@ -135,7 +135,7 @@ class DownloadService:
                 print(f"[DownloadService] Download already in progress for {streamer}, skipping")
                 return
 
-            # ADD THIS NEW CODE BLOCK HERE - Verify stream is still live
+            #Verify stream is still live
             try:
                 from backend.src.services.gql_client import GQLClient
                 gql_client = GQLClient()
