@@ -5,7 +5,7 @@ Never miss a stream again with this Twitch livestream downloader.
 This application uses Twitch EventSub to detect when a stream goes live, and Streamlink to start downloading with your selected settings.
 I needed something like TwitchLink that could run on a Linux server — and this was the solution.
 
-
+<img src="docs/webgui.png">
 
 ## Features
 
