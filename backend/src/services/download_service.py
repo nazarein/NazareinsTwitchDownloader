@@ -164,10 +164,22 @@ class DownloadService:
                     channel_info = await gql_client.get_channel_info(twitch_id)
                     if not channel_info or not channel_info.get("stream"):
                         print(f"[DownloadService] Stream is no longer live for {streamer}, aborting download")
+                        
+                        # Update streamer's live status in the configuration
+                        from backend.src.config.settings import get_monitored_streamers, update_monitored_streamers
+                        streamers = get_monitored_streamers()
+                        if streamer in streamers:
+                            streamers[streamer]["isLive"] = False
+                            update_monitored_streamers(streamers)
+                        
                         # Notify WebSocket clients
                         await self.websocket_manager.broadcast_download_status(
                             streamer, "stopped"
                         )
+                        await self.websocket_manager.broadcast_live_status(
+                            streamer, False
+                        )
+                        
                         return
             except Exception as e:
                 print(f"[DownloadService] Error checking live status for {streamer}: {e}")
