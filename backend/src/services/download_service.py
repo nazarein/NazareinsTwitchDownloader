@@ -5,6 +5,7 @@ import subprocess
 import platform
 import logging
 import json
+import time
 from typing import Dict, Set
 
 class DownloadService:
@@ -28,6 +29,8 @@ class DownloadService:
         self.running = False
         self.cancellation_flags = {}  # Maps streamers to their cancellation flags
         self.download_lock = asyncio.Lock() 
+        self.download_cooldowns = {}  # Track cooldown periods after natural completion
+        self.cooldown_duration = 30  # 30-second cooldown
         
     async def start(self):
         """
@@ -134,6 +137,13 @@ class DownloadService:
             if streamer in self.active_downloads:
                 print(f"[DownloadService] Download already in progress for {streamer}, skipping")
                 return
+                
+            # Check for cooldown period
+            current_time = time.time()
+            if streamer in self.download_cooldowns and current_time < self.download_cooldowns[streamer]:
+                remaining = int(self.download_cooldowns[streamer] - current_time)
+                print(f"[DownloadService] Download for {streamer} in cooldown period ({remaining}s remaining), skipping")
+                return
 
             #Verify stream is still live
             try:
@@ -183,7 +193,6 @@ class DownloadService:
                 print("[DownloadService] No auth cookie file found, will use alternative download method")
             
             # Create filename with date and stream title
-            import time
             import re
             
             date_str = time.strftime("%Y-%m-%d")
@@ -259,7 +268,6 @@ class DownloadService:
                     import streamlink
                     from streamlink.session import Streamlink
                     import threading
-                    import time
                     
                     # Create a new Streamlink session
                     session = Streamlink()
@@ -397,7 +405,6 @@ class DownloadService:
         try:
             import streamlink
             from streamlink.session import Streamlink
-            import time
             
             # Create a new Streamlink session
             session = Streamlink()
@@ -498,6 +505,10 @@ class DownloadService:
         """
         # Clean up and notify about download completion
         del self.active_downloads[streamer]
+        
+        # Set a cooldown to prevent immediate restart
+        self.download_cooldowns[streamer] = time.time() + self.cooldown_duration
+        
         if return_code == 0:
             await self.websocket_manager.broadcast_download_status(
                 streamer, "completed"

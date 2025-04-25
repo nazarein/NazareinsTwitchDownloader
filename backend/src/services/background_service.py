@@ -455,5 +455,12 @@ class StreamMonitorService:
                 settings.get("isLive", False) and 
                 streamer not in self.download_service.active_downloads):
                 
+                # Check for cooldown before restarting
+                current_time = time.time()
+                if (streamer in self.download_service.download_cooldowns and 
+                    current_time < self.download_service.download_cooldowns[streamer]):
+                    # Skip restart if in cooldown
+                    continue
+                    
                 print(f"[Monitor] 🔄 Restarting missing download for {streamer}")
                 await self.download_service.start_download(streamer, settings)
