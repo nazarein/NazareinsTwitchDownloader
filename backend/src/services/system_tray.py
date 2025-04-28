@@ -111,7 +111,7 @@ class SystemTrayService:
             # Create the system tray icon
             self.icon = pystray.Icon(self.app_name)
             self.icon.icon = image
-            self.icon.title = "Twitch Downloader"
+            self.icon.title = "Nazareins Twitch Downloader"
             
             # Set up the menu
             self.icon.menu = self._create_menu()
