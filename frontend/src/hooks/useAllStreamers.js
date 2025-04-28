@@ -249,13 +249,18 @@ export const useAllStreamers = () => {
       const { streamer, status } = event.detail;
       if (!streamer) return;
       
+      console.log(`[useAllStreamers] Received download status update for ${streamer}: ${status}`);
+      
       setAllStreamers(prev => {
         // Create a deep clone for the state update
         const newState = JSON.parse(JSON.stringify(prev));
         
         // Update download status if streamer exists
         if (newState.twitch[streamer]) {
+          console.log(`[useAllStreamers] Updating download status for ${streamer} to ${status}`);
           newState.twitch[streamer].downloadStatus = status;
+        } else {
+          console.log(`[useAllStreamers] Streamer ${streamer} not found in state`);
         }
         
         return newState;

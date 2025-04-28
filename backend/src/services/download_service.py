@@ -368,12 +368,19 @@ class DownloadService:
                 "filepath": filepath,
                 "cancellation_flag": self.cancellation_flags[streamer]
             }
-            
-            # Notify about download start
+
+            # Update status in persistent storage - ADD THIS CODE HERE
+            from backend.src.config.settings import get_monitored_streamers, update_monitored_streamers
+            streamers = get_monitored_streamers()
+            if streamer in streamers:
+                streamers[streamer]["downloadStatus"] = "downloading"
+                update_monitored_streamers(streamers)
+
+            # Notify about download start - THIS LINE ALREADY EXISTS
             await self.websocket_manager.broadcast_download_status(
                 streamer, "downloading"
             )
-            
+
             print(f"[DownloadService] Started download thread for {streamer}")
     
     async def stop_download(self, streamer):
@@ -405,6 +412,13 @@ class DownloadService:
             # Remove cancellation flag
             if streamer in self.cancellation_flags:
                 del self.cancellation_flags[streamer]
+            
+            # Update status in persistent storage
+            from backend.src.config.settings import get_monitored_streamers, update_monitored_streamers
+            streamers = get_monitored_streamers()
+            if streamer in streamers:
+                streamers[streamer]["downloadStatus"] = "stopped"
+                update_monitored_streamers(streamers)
                 
             # Notify WebSocket clients
             await self.websocket_manager.broadcast_download_status(
@@ -507,28 +521,31 @@ class DownloadService:
     async def _handle_download_completion(self, streamer, return_code):
         """
         Handle download completion for a streamer.
-        
-        Performs cleanup after a download finishes and notifies clients about
-        the completion status (success or error).
-        
-        Args:
-            streamer (str): Twitch username of the streamer
-            return_code (int): Return code from the download process (0 for success)
         """
         # Clean up and notify about download completion
-        del self.active_downloads[streamer]
+        if streamer in self.active_downloads:
+            del self.active_downloads[streamer]
         
         # Set a cooldown to prevent immediate restart
         self.download_cooldowns[streamer] = time.time() + self.cooldown_duration
         
-        if return_code == 0:
-            await self.websocket_manager.broadcast_download_status(
-                streamer, "completed"
-            )
-        else:
-            await self.websocket_manager.broadcast_download_status(
-                streamer, "error"
-            )
+        # Get streamers data to update status
+        from backend.src.config.settings import get_monitored_streamers, update_monitored_streamers
+        streamers = get_monitored_streamers()
+        
+        status = "completed" if return_code == 0 else "error"
+        
+        # Update the status in persistent storage
+        if streamer in streamers:
+            print(f"[DownloadService] Updating downloadStatus for {streamer} to {status}")
+            streamers[streamer]["downloadStatus"] = status
+            update_monitored_streamers(streamers)
+        
+        # Broadcast status update to clients
+        print(f"[DownloadService] Broadcasting download status for {streamer}: {status}")
+        await self.websocket_manager.broadcast_download_status(
+            streamer, status
+        )
         
     async def enable_downloads(self, streamer, enabled):
         """

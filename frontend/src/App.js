@@ -247,7 +247,7 @@ const App = () => {
                           profileImageURL={settings.profileImageURL}
                           title={settings.title || "Twitch Stream"}
                           downloads_enabled={settings.downloads_enabled || false}
-                          downloadStatus={settings.downloadStatus}
+                          downloadStatus={settings.downloadStatus || null}
                           stream_resolution={settings.stream_resolution || "best"} 
                           onDelete={() => handleDeleteStreamer(streamerName)}
                           onUpdateSettings={(settings) => handleUpdateSettings(streamerName, settings)}

@@ -307,6 +307,7 @@ class WebHandlers:
             This handler does not perform any Twitch API calls and uses
             only the locally cached information for quick responses.
         """
+    async def get_streamer_status(self, request: web.Request) -> web.Response:
         try:
             streamer = request.match_info["streamer"].lower()
             streamers = get_monitored_streamers()
@@ -317,32 +318,31 @@ class WebHandlers:
             settings = streamers[streamer]
             is_live = settings.get("isLive", False)
             
-            # Create response using ONLY cached data - no GQL queries
+            # Create response using cached data - no GQL queries
             status = {
                 "isLive": is_live,
                 "downloads_enabled": settings.get("downloads_enabled", False),
-                # Use "Offline" for the title when streamer is not live
                 "title": settings.get("title") if is_live else "Offline",
-                # Use offlineImageURL when streamer is offline
                 "thumbnail": settings.get("thumbnail") if is_live else settings.get("offlineImageURL", ""),
                 "storage_path": settings.get("save_directory", get_storage_path()),
                 "profileImageURL": settings.get("profileImageURL", ""),
                 "offlineImageURL": settings.get("offlineImageURL", ""),
-                "stream_resolution": settings.get("stream_resolution", "best")
+                "stream_resolution": settings.get("stream_resolution", "best"),
             }
             
-            # Include last update time if available
-            if hasattr(self, 'monitor_service') and streamer in self.monitor_service.last_update_time:
-                last_update = self.monitor_service.last_update_time[streamer]
-                status["last_updated"] = last_update
-                status["last_updated_ago"] = int(time.time() - last_update)
+            # Explicitly include download status if available
+            if "downloadStatus" in settings:
+                status["downloadStatus"] = settings["downloadStatus"]
+            # Also check active downloads if available
+            elif hasattr(self, 'monitor_service') and self.monitor_service:
+                if streamer in self.monitor_service.download_service.active_downloads:
+                    status["downloadStatus"] = "downloading"
             
             return web.json_response(status)
-            
         except Exception as e:
             print(f"Error getting streamer status: {e}")
             return web.json_response({"error": str(e)}, status=500)
-
+    
     async def get_eventsub_debug(self, request: web.Request) -> web.Response:
         """
         Get debug information about the EventSub service.

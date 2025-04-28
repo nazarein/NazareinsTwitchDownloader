@@ -70,8 +70,12 @@ const StreamerBar = memo(({
   
   // Synchronize download status with props
   useEffect(() => {
-    setDownloadState(downloadStatus);
-  }, [downloadStatus]);
+    // Synchronize download status with props
+    if (downloadStatus !== undefined && downloadStatus !== downloadState) {
+      console.log(`[StreamerBar] Updating download status for ${streamer} from ${downloadState} to ${downloadStatus}`);
+      setDownloadState(downloadStatus);
+    }
+  }, [downloadStatus, streamer]);
 
   /**
    * Update thumbnail source when stream status changes
@@ -122,8 +126,35 @@ const StreamerBar = memo(({
     getStreamerPath();
   }, [streamer]);
 
+  useEffect(() => {
+    const fetchStreamerStatus = async () => {
+      try {
+        console.log(`[StreamerBar] Fetching status for ${streamer}`);
+        const response = await fetch(`/api/streamers/${streamer}/status`);
+        const data = await response.json();
+        
+        console.log(`[StreamerBar] Received status for ${streamer}:`, data);
+        
+        // Update download status if present in the response
+        if (data.downloadStatus) {
+          console.log(`[StreamerBar] Setting download status to: ${data.downloadStatus}`);
+          setDownloadState(data.downloadStatus);
+        }
+      } catch (err) {
+        console.error('Failed to fetch streamer status:', err);
+      }
+    };
+    
+    fetchStreamerStatus();
+    
+    // Set up an interval to periodically refresh the status
+    const intervalId = setInterval(fetchStreamerStatus, 10000); // Refresh every 10 seconds
+    
+    // Clean up on unmount
+    return () => clearInterval(intervalId);
+  }, [streamer]);
+
   /**
-   * Add pulsing border animation style to document if not already present
    * This creates the visual effect for active downloads
    */
   useEffect(() => {
