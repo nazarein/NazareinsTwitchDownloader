@@ -797,7 +797,13 @@ class EventSubService:
         deletes them, handling rate limiting and ensuring all subscriptions
         are properly cleaned up before service shutdown.
         """
-        if not self.token:
+        # Get a fresh token from token manager if available
+        token_to_use = None
+        if hasattr(self, 'token_manager') and self.token_manager:
+            token_to_use, _ = await self.token_manager.get_access_token()
+        if not token_to_use:
+            token_to_use = self.token
+        if not token_to_use:
             print("[EventSub] No token available for unsubscribing")
             return
 
@@ -808,7 +814,7 @@ class EventSubService:
             url = "https://api.twitch.tv/helix/eventsub/subscriptions"
             headers = {
                 "Client-ID": EVENTSUB_CLIENT_ID,
-                "Authorization": f"Bearer {self.token}",
+                "Authorization": f"Bearer {token_to_use}",  # Use fresh token
             }
             
             ssl_context = ssl.create_default_context(cafile=certifi.where())
